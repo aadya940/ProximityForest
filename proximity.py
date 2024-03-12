@@ -170,6 +170,7 @@ class ProximityTreeNode:
     def _generate_branched_data(
         self,
         X_incoming,
+        y_incoming: np.ndarray = None, # Only useful while fitting the Model
     ):
         if not self.is_fit:
             raise ValueError("Fit the Node to get branched data.")
@@ -186,9 +187,27 @@ class ProximityTreeNode:
             for _idx in indices:
                 X_branch[_idx].append(xvals)
 
+        if y_incoming:
+            y_branch = [[] for _ in range(self.num_next_nodes)]
+            for yvals in y_incoming:
+                for _idx in indices:
+                    y_branch[_idx].append(yvals)
+            return X_branch, y_branch
+
         return X_branch
 
     def _generate_next_nodes(self):
         self.next_nodes = []
         for _ in range(self.num_next_nodes):
             self.next_nodes.append(ProximityTreeNode(depth=self.depth + 1))
+
+
+class ProximityTreeClassifier(BaseClassifier):
+    def __init__(self):
+        super().__init__()
+
+    def _fit(self, X, y):
+        pass
+
+    def _predict(self, X) -> np.ndarray:
+        pass
