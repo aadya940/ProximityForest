@@ -67,4 +67,10 @@ class TestProximityTreeClassifier(unittest.TestCase):
 
 
 if __name__ == "__main__":
+    print("Test the NODE: \n")
+    print("-----------------")
+    test_node()
+
+    print("TEST THE CLASSIFIER:  \n")
+    print("--------------------")
     unittest.main()
