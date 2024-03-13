@@ -16,6 +16,8 @@ from aeon.distances import (
     msm_distance,
 )
 
+from aeon.exceptions import NotFittedError
+
 DISTANCE_MEASURES = [
     euclidean_distance,
     ddtw_distance,
@@ -154,6 +156,9 @@ class ProximityTreeNode:
         self.leaf_node = False
         self.next_nodes = None
         self.is_fit = False
+        # self.distance_measures = None
+        # self.num_next_nodes = None
+        # self.exemplars = None
 
     def _fit(
         self,
@@ -190,7 +195,7 @@ class ProximityTreeNode:
 
         if (
             not self.leaf_node
-            and not self.is_fit
+            and (not self.is_fit)
             and len(X_incoming) != 0
             and len(y_incoming) != 0
         ):
@@ -201,6 +206,7 @@ class ProximityTreeNode:
             self.distance_measures, self.exemplars = self._generate_best_splitters(
                 X_incoming, y_incoming, _exemplars, _distance_measures
             )
+
             self.num_next_nodes = len(np.unique(y_incoming))
 
             self._generate_next_nodes()
@@ -274,9 +280,8 @@ class ProximityTreeNode:
                     )
 
             indices = np.argmin(_distance, axis=1)
-            for yvals in y_incoming_train:
-                for _idx in indices:
-                    y_branch[_idx].append(yvals)
+            for yvals, _idx in zip(y_incoming_train, indices):
+                y_branch[_idx].append(yvals)
 
             scores[i] = gini_difference(y_incoming_train, y_branch)
 
@@ -314,15 +319,13 @@ class ProximityTreeNode:
                 _distance[idxx, idxs] = func_with_params(dist, x_values, series)
 
         indices = np.argmin(_distance, axis=1)
-        for xvals in X_incoming:
-            for _idx in indices:
-                X_branch[_idx].append(xvals)
+        for xvals, _idx in zip(X_incoming, indices):
+            X_branch[_idx].append(xvals)
 
         if y_incoming is not None:
             y_branch = [[] for _ in range(self.num_next_nodes)]
-            for yvals in y_incoming:
-                for _idx in indices:
-                    y_branch[_idx].append(yvals)
+            for yvals, _idx in zip(y_incoming, indices):
+                y_branch[_idx].append(yvals)
             return np.array(X_branch), np.array(y_branch)
 
         return np.array(X_branch)
@@ -336,14 +339,14 @@ class ProximityTreeNode:
 
 class ProximityTreeClassifier(BaseClassifier):
     """Initialize ProximityTreeClassifier."""
-    def __init__(self):
+
+    def __init__(self, max_depth=5):
         super().__init__()
+        self.max_depth = max_depth
         self.root_node = None
         self.tree_depth = 0
 
-    def _fit(
-        self, X, y, num_candidates_for_selection=5, max_depth=5, min_samples_split=1
-    ):
+    def _fit(self, X, y, num_candidates_for_selection=5, min_samples_split=1):
         """
         Fit the classifier.
 
@@ -384,9 +387,10 @@ class ProximityTreeClassifier(BaseClassifier):
             X,
             y,
             num_candidates_for_selection=num_candidates_for_selection,
-            max_depth=max_depth,
+            max_depth=self.max_depth,
             min_samples_split=min_samples_split,
         )
+        self._is_fitted = True
 
     def _recursive_fit(
         self,
@@ -425,7 +429,7 @@ class ProximityTreeClassifier(BaseClassifier):
             len(np.unique(y)) == 1
             or node.depth == max_depth
             or len(y) < min_samples_split
-        ):
+        ) or (len(X_branch) == 0 or len(y_branch) == 0):
             node.leaf_node = True
             node.num_next_nodes = 0
             return
@@ -455,21 +459,20 @@ class ProximityTreeClassifier(BaseClassifier):
                 if next_node.depth > self.tree_depth:
                     self.tree_depth = next_node.depth
 
-                if len(X_branches[i]) != 0 and len(y_branches[i]) != 0:
-                    self._recursive_fit(
-                        next_node,
-                        X,
-                        y,
-                        X_branches[i],
-                        y_branches[i],
-                        num_candidates_for_selection,
-                        max_depth,
-                        min_samples_split,
-                    )
+                self._recursive_fit(
+                    next_node,
+                    X,
+                    y,
+                    X_branches[i],
+                    y_branches[i],
+                    num_candidates_for_selection,
+                    max_depth,
+                    min_samples_split,
+                )
 
     def _predict(self, X) -> np.ndarray:
-        # TODO
-        pass
+        if not self._is_fitted:
+            raise ValueError("Can't predict if the Model is not Fitted")
 
     def get_tree_depth(self):
         """
