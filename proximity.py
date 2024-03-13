@@ -29,8 +29,24 @@ DISTANCE_MEASURES = [
 ]
 
 
-# Select's Appropriate Parameters for Different Distances as described in the Paper
 def func_with_params(func: callable, X: np.ndarray, exemplar: np.ndarray):
+    """
+    Select appropriate parameters for different distances.
+
+    Parameters:
+    -----------
+    func : callable
+        Distance function.
+    X : np.ndarray
+        Data.
+    exemplar : np.ndarray
+        Exemplar data.
+
+    Returns:
+    --------
+    float
+        Calculated distance.
+    """
     _name = func.__name__
     if (
         _name == "euclidean_distance"
@@ -60,6 +76,19 @@ def func_with_params(func: callable, X: np.ndarray, exemplar: np.ndarray):
 
 
 def _gini_impurity(y):
+    """
+    Calculate Gini impurity.
+
+    Parameters:
+    -----------
+    y : np.ndarray
+        Target values.
+
+    Returns:
+    --------
+    float
+        Gini impurity.
+    """
     _, counts = np.unique(y, return_counts=True)
     probabilities = counts / len(y)
     gini = 1 - np.sum(probabilities**2)
@@ -67,6 +96,19 @@ def _gini_impurity(y):
 
 
 def _weighted_gini_impurity(y_branches: List[np.ndarray]):
+    """
+    Calculate weighted Gini impurity.
+
+    Parameters:
+    -----------
+    y_branches : List[np.ndarray]
+        List of target values for branches.
+
+    Returns:
+    --------
+    float
+        Weighted Gini impurity.
+    """
     total_samples = sum(len(y_branch) for y_branch in y_branches)
     weights = [len(y_branch) / total_samples for y_branch in y_branches]
     gini_impurities = [_gini_impurity(y_branch) for y_branch in y_branches]
@@ -75,6 +117,21 @@ def _weighted_gini_impurity(y_branches: List[np.ndarray]):
 
 
 def gini_difference(y_parent, y_branches: List[np.ndarray]):
+    """
+    Calculate Gini difference.
+
+    Parameters:
+    -----------
+    y_parent : np.ndarray
+        Parent target values.
+    y_branches : List[np.ndarray]
+        List of target values for branches.
+
+    Returns:
+    --------
+    float
+        Gini difference.
+    """
     return _gini_impurity(y_parent) - _weighted_gini_impurity(y_branches)
 
 
@@ -83,6 +140,15 @@ class ProximityTreeNode:
         self,
         depth,
     ):
+        """
+        Initialize ProximityTreeNode.
+
+        Parameters:
+        -----------
+        depth : int
+            Depth of the node.
+        """
+
         self.depth = depth
         self.incoming_classes = None
         self.leaf_node = False
@@ -98,6 +164,24 @@ class ProximityTreeNode:
         incoming_classes: List,  # Use class_dict instead present in Aeon Infrastrucutre
         num_candidates_for_selection=5,
     ):
+        """
+        Fit the node.
+
+        Parameters:
+        -----------
+        X : np.ndarray
+            Data.
+        y : np.ndarray
+            Target values.
+        X_incoming : np.ndarray
+            Incoming data.
+        y_incoming : np.ndarray
+            Incoming target values.
+        incoming_classes : List
+            List of incoming classes.
+        num_candidates_for_selection : int, optional
+            Number of candidates for selection. Defaults to 5.
+        """
         self.incoming_classes = incoming_classes
 
         if len(incoming_classes) == 1:
@@ -124,8 +208,23 @@ class ProximityTreeNode:
         self.is_fit = True
 
     def _generate_candidate_splitters(self, X, y, num_candidates=5):
-        # Complete X of the Training Data
-        # Complete Y of the Training Data
+        """
+        Generate candidate splitters.
+
+        Parameters:
+        -----------
+        X : np.ndarray
+            Data.
+        y : np.ndarray
+            Target values.
+        num_candidates : int, optional
+            Number of candidates. Defaults to 5.
+
+        Returns:
+        --------
+        List[callable], np.ndarray
+            Distance measures and exemplars.
+        """
         _measures = []
         _exemplars = [[] for _ in range(num_candidates)]
         for j in range(num_candidates):
@@ -134,9 +233,6 @@ class ProximityTreeNode:
                 _val = random.choice(X[y == i])
                 _exemplars[j].append(_val)
         _exemplars = np.array(_exemplars)
-
-        # _measures: List[distance measures]
-        # Exemplars: ndarray[num_candidates, num_incoming_classs]
         return _measures, _exemplars
 
     def _generate_best_splitters(
@@ -146,10 +242,29 @@ class ProximityTreeNode:
         exemplars,  # List of exemplars, each exemplar contains a series for each class
         distance_measures: List,  # List of distance measures
     ):
+        """
+        Generate splitters that maximize the difference in Gini
+        Difference.
+
+        Parameters:
+        -----------
+        X_incoming_train : np.ndarray
+            Incoming data.
+        y_incoming_train : np.ndarray
+            Incoming target values.
+        exemplars : np.ndarray
+            Exemplars.
+        distance_measures : List[callable]
+            Distance measures.
+
+        Returns:
+        --------
+        Tuple[callable, np.ndarray]
+            Best distance measure and exemplars.
+        """
         scores = np.zeros(len(exemplars))
         y_branch = [[] for _ in range(len(np.unique(y_incoming_train)))]
         for i, exemplar in enumerate(exemplars):
-            # For a Particular distance measure and `c` exemplars
             dist = distance_measures[i]
             _distance = np.zeros((len(X_incoming_train), len(exemplars[0])))
             for idxs, series in enumerate(exemplar):
@@ -173,6 +288,21 @@ class ProximityTreeNode:
         X_incoming,
         y_incoming: np.ndarray = None,  # Only useful while fitting the Model
     ):
+        """
+        Generate branched data.
+
+        Parameters:
+        -----------
+        X_incoming : np.ndarray
+            Incoming data.
+        y_incoming : np.ndarray, optional
+            Incoming target values. Defaults to None.
+
+        Returns:
+        --------
+        Union[np.ndarray, [np.ndarray, np.ndarray]]
+            Branched data or branched data and target values.
+        """
         if not self.is_fit:
             raise ValueError("Fit the Node to get branched data.")
 
@@ -198,12 +328,14 @@ class ProximityTreeNode:
         return np.array(X_branch)
 
     def _generate_next_nodes(self):
+        """Generate next nodes."""
         self.next_nodes = []
         for _ in range(self.num_next_nodes):
             self.next_nodes.append(ProximityTreeNode(depth=self.depth + 1))
 
 
 class ProximityTreeClassifier(BaseClassifier):
+    """Initialize ProximityTreeClassifier."""
     def __init__(self):
         super().__init__()
         self.root_node = None
@@ -212,6 +344,22 @@ class ProximityTreeClassifier(BaseClassifier):
     def _fit(
         self, X, y, num_candidates_for_selection=5, max_depth=5, min_samples_split=1
     ):
+        """
+        Fit the classifier.
+
+        Parameters:
+        -----------
+        X : np.ndarray
+            Data.
+        y : np.ndarray
+            Target values.
+        num_candidates_for_selection : int, optional
+            Number of candidates for selection. Defaults to 5.
+        max_depth : int, optional
+            Maximum depth of the tree. Defaults to 5.
+        min_samples_split : int, optional
+            Minimum number of samples required to split a node. Defaults to 1.
+        """
         self.n_instances_, self.n_atts_ = X.shape
         self.classes_ = np.unique(y)
         self.n_classes_ = self.classes_.shape[0]
@@ -251,6 +399,28 @@ class ProximityTreeClassifier(BaseClassifier):
         max_depth,
         min_samples_split,
     ):
+        """
+        Recursively Build and Fit the Tree.
+
+        Parameters:
+        -----------
+        node : ProximityTreeNode
+            Current node.
+        X : np.ndarray
+            Data.
+        y : np.ndarray
+            Target values.
+        X_branch : np.ndarray
+            Branched data.
+        y_branch : np.ndarray
+            Branched target values.
+        num_candidates_for_selection : int
+            Number of candidates for selection.
+        max_depth : int
+            Maximum depth of the tree.
+        min_samples_split : int
+            Minimum number of samples required to split a node.
+        """
         if (
             len(np.unique(y)) == 1
             or node.depth == max_depth
@@ -302,4 +472,12 @@ class ProximityTreeClassifier(BaseClassifier):
         pass
 
     def get_tree_depth(self):
+        """
+        Get the depth of the tree.
+
+        Returns:
+        --------
+        int
+            Depth of the tree.
+        """
         return self.tree_depth
