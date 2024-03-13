@@ -43,7 +43,6 @@ def test_node():
 
     print("Generate Branched Data : ")
     print("-------------------------")
-    print(node.leaf_node)
     branched_data = node._generate_branched_data(X)
     for idx, data in enumerate(branched_data):
         print(f"Branch {idx}: ")

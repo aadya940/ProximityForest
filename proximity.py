@@ -209,8 +209,7 @@ class ProximityTreeNode:
 
             self.num_next_nodes = len(np.unique(y_incoming))
 
-            self._generate_next_nodes()
-
+        self._generate_next_nodes()
         self.is_fit = True
 
     def _generate_candidate_splitters(self, X, y, num_candidates=5):
@@ -333,8 +332,9 @@ class ProximityTreeNode:
     def _generate_next_nodes(self):
         """Generate next nodes."""
         self.next_nodes = []
-        for _ in range(self.num_next_nodes):
-            self.next_nodes.append(ProximityTreeNode(depth=self.depth + 1))
+        if not self.leaf_node:
+            for _ in range(self.num_next_nodes):
+                self.next_nodes.append(ProximityTreeNode(depth=self.depth + 1))
 
 
 class ProximityTreeClassifier(BaseClassifier):
@@ -443,9 +443,8 @@ class ProximityTreeClassifier(BaseClassifier):
             num_candidates_for_selection,
         )
 
-        X_branches, y_branches = node._generate_branched_data(X, y)
-
-        if node.next_nodes is not None:
+        if len(node.next_nodes) > 0:
+            X_branches, y_branches = node._generate_branched_data(X, y)
             for i, next_node in enumerate(node.next_nodes):
                 next_node._fit(
                     X,
@@ -459,16 +458,17 @@ class ProximityTreeClassifier(BaseClassifier):
                 if next_node.depth > self.tree_depth:
                     self.tree_depth = next_node.depth
 
-                self._recursive_fit(
-                    next_node,
-                    X,
-                    y,
-                    X_branches[i],
-                    y_branches[i],
-                    num_candidates_for_selection,
-                    max_depth,
-                    min_samples_split,
-                )
+                if (len(X_branches[i]) != 0) and (len(y_branches[i]) != 0):
+                    self._recursive_fit(
+                        next_node,
+                        X,
+                        y,
+                        X_branches[i],
+                        y_branches[i],
+                        num_candidates_for_selection,
+                        max_depth,
+                        min_samples_split,
+                    )
 
     def _predict(self, X) -> np.ndarray:
         if not self._is_fitted:
