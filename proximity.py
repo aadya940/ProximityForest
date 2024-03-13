@@ -346,7 +346,7 @@ class ProximityTreeClassifier(BaseClassifier):
         self.root_node = None
         self.tree_depth = 0
 
-    def _fit(self, X, y, num_candidates_for_selection=5, min_samples_split=1):
+    def _fit(self, X, y, num_candidates_for_selection=5, min_samples_split=2):
         """
         Fit the classifier.
 
@@ -361,7 +361,7 @@ class ProximityTreeClassifier(BaseClassifier):
         max_depth : int, optional
             Maximum depth of the tree. Defaults to 5.
         min_samples_split : int, optional
-            Minimum number of samples required to split a node. Defaults to 1.
+            Minimum number of samples required to split a node. Defaults to 2.
         """
         self.n_instances_, self.n_atts_ = X.shape
         self.classes_ = np.unique(y)
