@@ -135,7 +135,7 @@ class ProximityTreeNode:
             for i in self.incoming_classes:
                 _val = random.choice(X[y == i])
                 _exemplars[j].append(_val)
-        _exemplars = np.array(_exemplars, dtype=object)
+        _exemplars = np.array(_exemplars)
 
         # _measures: List[distance measures]
         # Exemplars: ndarray[num_candidates, num_incoming_classs]
@@ -168,7 +168,7 @@ class ProximityTreeNode:
             scores[i] = gini_difference(y_incoming_train, y_branch)
 
         idx = np.argmax(scores)
-        return distance_measures[idx], exemplars[idx]
+        return distance_measures[idx], np.array(exemplars[idx])
 
     def _generate_branched_data(
         self,
@@ -195,9 +195,9 @@ class ProximityTreeNode:
             for yvals in y_incoming:
                 for _idx in indices:
                     y_branch[_idx].append(yvals)
-            return np.array(X_branch, dtype=object), np.array(y_branch, dtype=object)
+            return np.array(X_branch), np.array(y_branch)
 
-        return np.array(X_branch, dtype=object)
+        return np.array(X_branch)
 
     def _generate_next_nodes(self):
         self.next_nodes = []
