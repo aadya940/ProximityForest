@@ -59,7 +59,6 @@ class TestProximityTreeClassifier(unittest.TestCase):
     def test_fit(self):
         clf = ProximityTreeClassifier()
         clf._fit(self.X_train, self.y_train)
-
         assert clf.root_node is not None
         assert clf.root_node.next_nodes is not None
         assert isinstance(clf.root_node.next_nodes, list)

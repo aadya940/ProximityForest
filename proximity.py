@@ -209,6 +209,7 @@ class ProximityTreeClassifier(BaseClassifier):
     def __init__(self):
         super().__init__()
         self.root_node = None
+        self.tree_depth = 0
 
     def _fit(
         self, X, y, num_candidates_for_selection=5, max_depth=5, min_samples_split=1
@@ -267,6 +268,9 @@ class ProximityTreeClassifier(BaseClassifier):
                     num_candidates_for_selection,
                 )
 
+                if next_node.depth > self.tree_depth:
+                    self.tree_depth = next_node.depth
+
                 if len(X_branches[i]) != 0 and len(y_branches[i]) != 0:
                     self._recursive_fit(
                         next_node,
@@ -282,3 +286,6 @@ class ProximityTreeClassifier(BaseClassifier):
     def _predict(self, X) -> np.ndarray:
         # TODO
         pass
+
+    def get_tree_depth(self):
+        return self.tree_depth
