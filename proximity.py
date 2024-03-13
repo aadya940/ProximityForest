@@ -29,13 +29,6 @@ DISTANCE_MEASURES = [
     twe_distance,
     msm_distance,
 ]
-"""
-Left Out Distance Measures
---------------------------
-
-Dynamic Time Warping with a restricted warping window (DTW-R); 
-Derivative Dynamic Time Warping with a restricted warping window (DDTW-R); 
-"""
 
 
 # Select's Appropriate Parameters for Different Distances as described in the Paper
@@ -113,16 +106,23 @@ class ProximityTreeNode:
             self.leaf_node = True
             self.num_next_nodes = 0
 
-        if not self.leaf_node:
+        if (
+            not self.leaf_node
+            and not self.is_fit
+            and len(X_incoming) != 0
+            and len(y_incoming) != 0
+        ):
             _distance_measures, _exemplars = self._generate_candidate_splitters(
                 X, y, num_candidates=num_candidates_for_selection
             )
+
             self.distance_measures, self.exemplars = self._generate_best_splitters(
                 X_incoming, y_incoming, _exemplars, _distance_measures
             )
             self.num_next_nodes = len(np.unique(y_incoming))
 
-        self._generate_next_nodes()
+            self._generate_next_nodes()
+
         self.is_fit = True
 
     def _generate_candidate_splitters(self, X, y, num_candidates=5):
@@ -133,8 +133,9 @@ class ProximityTreeNode:
         for j in range(num_candidates):
             _measures.append(random.choice(DISTANCE_MEASURES))
             for i in self.incoming_classes:
-                _exemplars[j].append(random.choice(X[y == i]))
-        _exemplars = np.array(_exemplars)
+                _val = random.choice(X[y == i])
+                _exemplars[j].append(_val)
+        _exemplars = np.array(_exemplars, dtype=object)
 
         # _measures: List[distance measures]
         # Exemplars: ndarray[num_candidates, num_incoming_classs]
@@ -144,7 +145,7 @@ class ProximityTreeNode:
         self,
         X_incoming_train,  # Array of X values (ndarray)
         y_incoming_train,  # Array of y values (ndarray)
-        exemplars,          # List of exemplars, each exemplar contains a series for each class
+        exemplars,  # List of exemplars, each exemplar contains a series for each class
         distance_measures: List,  # List of distance measures
     ):
         scores = np.zeros(len(exemplars))
@@ -152,10 +153,12 @@ class ProximityTreeNode:
         for i, exemplar in enumerate(exemplars):
             # For a Particular distance measure and `c` exemplars
             dist = distance_measures[i]
-            _distance = np.zeros((X_incoming_train.shape[0], len(exemplars[0])))
+            _distance = np.zeros((len(X_incoming_train), len(exemplars[0])))
             for idxs, series in enumerate(exemplar):
                 for idxx, x_values in enumerate(X_incoming_train):
-                    _distance[idxx, idxs] = func_with_params(dist, x_values, series)
+                    _distance[idxx, idxs] = func_with_params(
+                        dist, np.array(x_values), np.array(series)
+                    )
 
             indices = np.argmin(_distance, axis=1)
             for yvals in y_incoming_train:
@@ -170,7 +173,7 @@ class ProximityTreeNode:
     def _generate_branched_data(
         self,
         X_incoming,
-        y_incoming: np.ndarray = None, # Only useful while fitting the Model
+        y_incoming: np.ndarray = None,  # Only useful while fitting the Model
     ):
         if not self.is_fit:
             raise ValueError("Fit the Node to get branched data.")
@@ -187,14 +190,14 @@ class ProximityTreeNode:
             for _idx in indices:
                 X_branch[_idx].append(xvals)
 
-        if y_incoming:
+        if y_incoming is not None:
             y_branch = [[] for _ in range(self.num_next_nodes)]
             for yvals in y_incoming:
                 for _idx in indices:
                     y_branch[_idx].append(yvals)
-            return X_branch, y_branch
+            return np.array(X_branch, dtype=object), np.array(y_branch, dtype=object)
 
-        return X_branch
+        return np.array(X_branch, dtype=object)
 
     def _generate_next_nodes(self):
         self.next_nodes = []
@@ -205,9 +208,77 @@ class ProximityTreeNode:
 class ProximityTreeClassifier(BaseClassifier):
     def __init__(self):
         super().__init__()
+        self.root_node = None
 
-    def _fit(self, X, y):
-        pass
+    def _fit(
+        self, X, y, num_candidates_for_selection=5, max_depth=5, min_samples_split=1
+    ):
+        self.root_node = ProximityTreeNode(depth=0)
+        self._recursive_fit(
+            self.root_node,
+            X,
+            y,
+            X,
+            y,
+            num_candidates_for_selection=num_candidates_for_selection,
+            max_depth=max_depth,
+            min_samples_split=min_samples_split,
+        )
+
+    def _recursive_fit(
+        self,
+        node,
+        X,
+        y,
+        X_branch,
+        y_branch,
+        num_candidates_for_selection,
+        max_depth,
+        min_samples_split,
+    ):
+        if (
+            len(np.unique(y)) == 1
+            or node.depth == max_depth
+            or len(y) < min_samples_split
+        ):
+            node.leaf_node = True
+            node.num_next_nodes = 0
+            return
+
+        node._fit(
+            X,
+            y,
+            X_branch,
+            y_branch,
+            np.unique(y).tolist(),
+            num_candidates_for_selection,
+        )
+
+        X_branches, y_branches = node._generate_branched_data(X, y)
+
+        if node.next_nodes is not None:
+            for i, next_node in enumerate(node.next_nodes):
+                next_node._fit(
+                    X,
+                    y,
+                    X_branches[i],
+                    y_branches[i],
+                    np.unique(y_branches[i]).tolist(),
+                    num_candidates_for_selection,
+                )
+
+                if len(X_branches[i]) != 0 and len(y_branches[i]) != 0:
+                    self._recursive_fit(
+                        next_node,
+                        X,
+                        y,
+                        X_branches[i],
+                        y_branches[i],
+                        num_candidates_for_selection,
+                        max_depth,
+                        min_samples_split,
+                    )
 
     def _predict(self, X) -> np.ndarray:
+        # TODO
         pass
