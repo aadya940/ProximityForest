@@ -1,11 +1,9 @@
 import numpy as np
 import random
 from typing import List
-from numba import njit
-import pandas as pd
 
+from sklearn.preprocessing import LabelEncoder
 from aeon.classification.base import BaseClassifier
-from aeon.utils.validation import check_n_jobs
 from aeon.distances import (
     euclidean_distance,
     ddtw_distance,
@@ -214,6 +212,22 @@ class ProximityTreeClassifier(BaseClassifier):
     def _fit(
         self, X, y, num_candidates_for_selection=5, max_depth=5, min_samples_split=1
     ):
+        self.n_instances_, self.n_atts_ = X.shape
+        self.classes_ = np.unique(y)
+        self.n_classes_ = self.classes_.shape[0]
+        self._class_dictionary = {}
+        for index, classVal in enumerate(self.classes_):
+            self._class_dictionary[classVal] = index
+
+        # escape if only one class seen
+        if self.n_classes_ == 1:
+            self._is_fitted = True
+            return self
+
+        if not np.issubdtype(self.classes_.dtype, np.integer):
+            le = LabelEncoder()
+            y = le.fit_transform(y)
+
         self.root_node = ProximityTreeNode(depth=0)
         self._recursive_fit(
             self.root_node,
