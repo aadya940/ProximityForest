@@ -363,17 +363,20 @@ class ProximityTreeClassifier(BaseClassifier):
         min_samples_split : int, optional
             Minimum number of samples required to split a node. Defaults to 2.
         """
-        self.n_instances_, self.n_atts_ = X.shape
-        self.classes_ = np.unique(y)
-        self.n_classes_ = self.classes_.shape[0]
+        self.n_instances_, self.n_atts_ = X.shape           # Num rows = n_instances, Num cols = n_atts_
+        self.classes_ = np.unique(y)                        # Classes
+        self.n_classes_ = self.classes_.shape[0]            # Number of Class
         self._class_dictionary = {}
         for index, classVal in enumerate(self.classes_):
-            self._class_dictionary[classVal] = index
+            self._class_dictionary[classVal] = index        # Class Indices
 
         # escape if only one class seen
         if self.n_classes_ == 1:
             self._is_fitted = True
-            return self
+            self.root_node = ProximityTreeNode(depth=0)
+            self.root_node.leaf_node = True
+            self.root_node.num_next_nodes = 0
+            return
 
         if not np.issubdtype(self.classes_.dtype, np.integer):
             le = LabelEncoder()
@@ -473,6 +476,8 @@ class ProximityTreeClassifier(BaseClassifier):
     def _predict(self, X) -> np.ndarray:
         if not self._is_fitted:
             raise ValueError("Can't predict if the Model is not Fitted")
+        
+        raise NotImplementedError
 
     def get_tree_depth(self):
         """
