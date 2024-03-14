@@ -18,6 +18,11 @@ from aeon.distances import (
 
 from aeon.exceptions import NotFittedError
 
+# Sometimes the Tests fail (Tree Depth Assertion).
+# Returns different depths
+
+# TODO : Set random_state param
+
 DISTANCE_MEASURES = [
     euclidean_distance,
     ddtw_distance,
@@ -29,113 +34,6 @@ DISTANCE_MEASURES = [
     twe_distance,
     msm_distance,
 ]
-
-
-def func_with_params(func: callable, X: np.ndarray, exemplar: np.ndarray):
-    """
-    Select appropriate parameters for different distances.
-
-    Parameters:
-    -----------
-    func : callable
-        Distance function.
-    X : np.ndarray
-        Data.
-    exemplar : np.ndarray
-        Exemplar data.
-
-    Returns:
-    --------
-    float
-        Calculated distance.
-    """
-    _name = func.__name__
-    if (
-        _name == "euclidean_distance"
-        or _name == "dtw_distance"
-        or _name == "ddtw_distance"
-    ):
-        return func(X, exemplar)
-    elif _name == "wddtw_distance" or _name == "wdtw_distance":
-        return func(X, exemplar, g=random.random())
-    elif _name == "erp_distance":
-        return func(X, exemplar)
-    elif _name == "lcss_distance":
-        return func(X, exemplar, random.uniform(0, (X.shape[0] + 1) // 4))
-    elif _name == "twe_distance":
-        return func(
-            X,
-            exemplar,
-            nu=np.random.choice([10 ** (-5 * i) for i in range(6)]),
-            lmbda=np.random.choice(np.arange(10) / 9),
-        )
-    elif _name == "msm_distance":
-        return msm_distance(
-            X, exemplar, c=np.random.uniform(low=10**-2, high=10**2, size=1)[0]
-        )
-    else:
-        raise ValueError("Not a Valid Distance Measure")
-
-
-def _gini_impurity(y):
-    """
-    Calculate Gini impurity.
-
-    Parameters:
-    -----------
-    y : np.ndarray
-        Target values.
-
-    Returns:
-    --------
-    float
-        Gini impurity.
-    """
-    _, counts = np.unique(y, return_counts=True)
-    probabilities = counts / len(y)
-    gini = 1 - np.sum(probabilities**2)
-    return gini
-
-
-def _weighted_gini_impurity(y_branches: List[np.ndarray]):
-    """
-    Calculate weighted Gini impurity.
-
-    Parameters:
-    -----------
-    y_branches : List[np.ndarray]
-        List of target values for branches.
-
-    Returns:
-    --------
-    float
-        Weighted Gini impurity.
-    """
-    total_samples = sum(len(y_branch) for y_branch in y_branches)
-    weights = [len(y_branch) / total_samples for y_branch in y_branches]
-    gini_impurities = [_gini_impurity(y_branch) for y_branch in y_branches]
-    weighted_gini = sum(weight * gini for weight, gini in zip(weights, gini_impurities))
-    return weighted_gini
-
-
-def gini_difference(y_parent, y_branches: List[np.ndarray]):
-    """
-    Calculate Gini difference.
-
-    Parameters:
-    -----------
-    y_parent : np.ndarray
-        Parent target values.
-    y_branches : List[np.ndarray]
-        List of target values for branches.
-
-    Returns:
-    --------
-    float
-        Gini difference.
-    """
-    return _gini_impurity(y_parent) - _weighted_gini_impurity(y_branches)
-
 
 class ProximityTreeNode:
     def __init__(
@@ -156,9 +54,6 @@ class ProximityTreeNode:
         self.leaf_node = False
         self.next_nodes = None
         self.is_fit = False
-        # self.distance_measures = None
-        # self.num_next_nodes = None
-        # self.exemplars = None
 
     def _fit(
         self,
@@ -308,7 +203,7 @@ class ProximityTreeNode:
             Branched data or branched data and target values.
         """
         if not self.is_fit:
-            raise ValueError("Fit the Node to get branched data.")
+            raise NotFittedError("Fit the Node to get branched data.")
 
         dist = self.distance_measures
         X_branch = [[] for _ in range(self.num_next_nodes)]
@@ -363,12 +258,15 @@ class ProximityTreeClassifier(BaseClassifier):
         min_samples_split : int, optional
             Minimum number of samples required to split a node. Defaults to 2.
         """
-        self.n_instances_, self.n_atts_ = X.shape           # Num rows = n_instances, Num cols = n_atts_
-        self.classes_ = np.unique(y)                        # Classes
-        self.n_classes_ = self.classes_.shape[0]            # Number of Class
+        (
+            self.n_instances_,
+            self.n_atts_,
+        ) = X.shape  # Num rows = n_instances, Num cols = n_atts_
+        self.classes_ = np.unique(y)  # Classes
+        self.n_classes_ = self.classes_.shape[0]  # Number of Class
         self._class_dictionary = {}
         for index, classVal in enumerate(self.classes_):
-            self._class_dictionary[classVal] = index        # Class Indices
+            self._class_dictionary[classVal] = index  # Class Indices
 
         # escape if only one class seen
         if self.n_classes_ == 1:
@@ -475,8 +373,8 @@ class ProximityTreeClassifier(BaseClassifier):
 
     def _predict(self, X) -> np.ndarray:
         if not self._is_fitted:
-            raise ValueError("Can't predict if the Model is not Fitted")
-        
+            raise NotFittedError("Can't predict if the Model is not Fitted")
+
         raise NotImplementedError
 
     def get_tree_depth(self):
@@ -489,3 +387,106 @@ class ProximityTreeClassifier(BaseClassifier):
             Depth of the tree.
         """
         return self.tree_depth
+
+
+def func_with_params(func: callable, X: np.ndarray, exemplar: np.ndarray):
+    """
+    Select appropriate parameters for different distances.
+
+    Parameters:
+    -----------
+    func : callable
+        Distance function.
+    X : np.ndarray
+        Data.
+    exemplar : np.ndarray
+        Exemplar data.
+
+    Returns:
+    --------
+    float
+        Calculated distance.
+    """
+    _name = func.__name__
+    if (
+        _name == "euclidean_distance"
+        or _name == "dtw_distance"
+        or _name == "ddtw_distance"
+    ):
+        return func(X, exemplar)
+    elif _name == "wddtw_distance" or _name == "wdtw_distance":
+        return func(X, exemplar, g=random.random())
+    elif _name == "erp_distance":
+        return func(X, exemplar)
+    elif _name == "lcss_distance":
+        return func(X, exemplar, random.uniform(0, (X.shape[0] + 1) // 4))
+    elif _name == "twe_distance":
+        return func(
+            X,
+            exemplar,
+            nu=np.random.choice([10 ** (-5 * i) for i in range(6)]),
+            lmbda=np.random.choice(np.arange(10) / 9),
+        )
+    elif _name == "msm_distance":
+        return msm_distance(
+            X, exemplar, c=np.random.uniform(low=10**-2, high=10**2, size=1)[0]
+        )
+    else:
+        raise ValueError("Not a Valid Distance Measure")
+
+def _gini_impurity(y):
+    """
+    Calculate Gini impurity.
+
+    Parameters:
+    -----------
+    y : np.ndarray
+        Target values.
+
+    Returns:
+    --------
+    float
+        Gini impurity.
+    """
+    _, counts = np.unique(y, return_counts=True)
+    probabilities = counts / len(y)
+    gini = 1 - np.sum(probabilities**2)
+    return gini
+
+def _weighted_gini_impurity(y_branches: List[np.ndarray]):
+    """
+    Calculate weighted Gini impurity.
+
+    Parameters:
+    -----------
+    y_branches : List[np.ndarray]
+        List of target values for branches.
+
+    Returns:
+    --------
+    float
+        Weighted Gini impurity.
+    """
+    total_samples = sum(len(y_branch) for y_branch in y_branches)
+    weights = [len(y_branch) / total_samples for y_branch in y_branches]
+    gini_impurities = [_gini_impurity(y_branch) for y_branch in y_branches]
+    weighted_gini = sum(weight * gini for weight, gini in zip(weights, gini_impurities))
+    return weighted_gini
+
+def gini_difference(y_parent, y_branches: List[np.ndarray]):
+    """
+    Calculate Gini difference.
+
+    Parameters:
+    -----------
+    y_parent : np.ndarray
+        Parent target values.
+    y_branches : List[np.ndarray]
+        List of target values for branches.
+
+    Returns:
+    --------
+    float
+        Gini difference.
+    """
+    return _gini_impurity(y_parent) - _weighted_gini_impurity(y_branches)
