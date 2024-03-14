@@ -18,9 +18,6 @@ from aeon.distances import (
 
 from aeon.exceptions import NotFittedError
 
-# Sometimes the Tests fail (Tree Depth Assertion).
-# Returns different depths
-
 # TODO : Set random_state param
 
 DISTANCE_MEASURES = [
